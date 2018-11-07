@@ -4,6 +4,7 @@ Created on Fri Nov 2 2018
 @author: J. Guymont and M. Mehdizadeh
 """
 import numpy as np
+import copy
 
 from nn import NN
 
@@ -23,63 +24,159 @@ class MLPClassifier(NN):
         self.input_size = input_size 
         self.ouput_size = ouput_size
         self.hidden_size = hidden_size
-        self.W1 = self.uniform_initalization(shape=(hidden_size, input_size))
-        self.b1 = self.zero_initialization(shape=(hidden_size, 1))
-        self.W2 = self.uniform_initalization(shape=(ouput_size, hidden_size))
-        self.b2 = self.zero_initialization(shape=(ouput_size, 1))
+        self.W_xh = self.uniform_initalization(shape=(hidden_size, input_size))
+        self.b_xh = self.zero_initialization(shape=(hidden_size, 1))
+        self.W_hy = self.uniform_initalization(shape=(ouput_size, hidden_size))
+        self.b_hy = self.zero_initialization(shape=(ouput_size, 1))
 
-    def forward(self, x):
+        self.grad_W_xh = 0
+        self.grad_b_xh = 0
+        self.grad_W_hy = 0
+        self.grad_b_hy = 0
+
+        # we will keep activations for the backward propagations
+        self.ha = None
+        self.hs = None
+        self.oa = None
+        self.os = None
+
+        # we will keep the gradients that are use 
+        # to compute the gradient of more then one 
+        # parameters
+        self.grad_oa = None
+        self.grad_ha = None
+
+    def parameters(self):
+        return [self.W_xh, self.b_xh, self.W_hy, self.b_hy]
+
+    def gradients(self):
+        return [self.grad_W_xh, self.grad_b_xh, self.grad_W_hy, self.grad_b_hy]
+
+    def forward(self, x, train=False):
         """Forward propagation
         
         Args
             x: (array) array of dimension <n x d>
         """
-        try:
-            d = x.shape[1]
-        except IndexError:
-            d = x.shape[0]
-            x = x.reshape(1, d)
-        ha = self.W1.dot(x.T) + self.b1
+        x = self._validate_input(x)
+        ha = self.W_xh.dot(x.T) + self.b_xh
         hs = self.relu(ha)
-        oa = self.W2.dot(hs) + self.b2
+        oa = self.W_hy.dot(hs) + self.b_hy
         os = self.softmax(oa)
+        if train:
+            self.ha, self.hs, self.oa, self.os = ha, hs, oa, os
         return os
 
-    def backward(self, x, y):
+    def backward(self, X, Y):
         """Backward probagation
+
+        Args
+            X: (array) input batch of dimension <k x d>
+            Y: (array) target batch of dimension <k x 1>
         """
-        x = x.reshape(1, self.input_size)
-
-        # forward propagation
-        ha = self.W1.dot(x.T) + self.b1
-        hs = self.relu(ha)
-        oa = self.W2.dot(hs) + self.b2
-        os = self.softmax(oa)
+        X = self._validate_input(X)
+        batch_size = X.shape[0]
+        d = X.shape[1]
+        Y = [Y] if Y.shape == () else Y
         
-        # gradient of L wrt W2
-        grad_oa = os - self._onehot(y) # <m x 1>
-        grad_w2 = grad_oa.dot(hs.T)    # <m x H>
+        for x, y in zip(X, Y):
+            self.forward(x, train=True)
+            x = x.reshape(1, d)
+            self.grad_W_hy += self._get_gradient_W_hy(y)
+            self.grad_b_hy += self._get_gradient_b_hy()
+            self.grad_W_xh += self._get_gradient_W_xh(x)
+            self.grad_b_xh += self._get_gradient_b_xh()
+
+        for grad in self.gradients():
+            grad /= batch_size 
+
+        self._reset_activations()
+
+    def optimize(self, X, Y):
+        for x, y in zip(X, Y):
+            self.backward(x, y)
+
+    def finite_difference_check(self, x, y, eps=1e-5):
+        """Finite difference gradient check
         
-        # gradient of L wrt b2
-        grad_b2 = grad_oa              # <m x 1>
+            gradient ~= (L(x, y; w + eps) - L(x, y; w)) / eps = grad_hat
 
-        # gradient of L wrt W1
-        grad_hs_ha = np.diag(self._relu_derivative(ha).reshape(self.hidden_size,))
-        grad_ha = grad_oa.T.dot(self.W2).dot(grad_hs_ha) 
-        grad_w1 = grad_ha.T.dot(x)
-
-        # gradient of L wrt b1
-        grad_b1 = grad_ha.T
-
+            Should have 0.99 < grad / grad_hat < 1.01 
+        """ 
+        loss1 = self.nll_loss(x, y) 
+        for param, grad in zip(self.parameters(), self.gradients()):
+            for i in range(param.shape[0]):
+                for j in range(param.shape[1]):
+                    param[i,j] += eps
+                    loss2 = self.nll_loss(x, y)
+                    param[i,j] -= eps
+                    gradHat = (loss2 - loss1) / eps
+                    ratio = (grad[i,j]+1e-10) / (gradHat[0][0]+1e-10)
+                    if not 0.99 < ratio < 1.01:
+                        raise Warning('Finite difference not valid: ratio = {}'.format(ratio))
+            
     def nll_loss(self, x, y):
         """Negative loss likelihood
 
         Args
             x: (array) input
-            y: (int) class \in {0,...,m-1} where m is the number of classes
+            y: (int) class in {0,...,m-1} where m is the number of classes
         """
-        prob = self.forward(x).dot(self._onehot(y))
+        prob = self.forward(x).T.dot(self._onehot(y))
         return -np.log(prob)
+
+    def _validate_input(self, x):
+        """Make sure the input have the dimension <n x d>
+        where n is the size of a batch"""
+        try:
+            d = x.shape[1]
+            if not d == self.input_size:
+                raise ValueError('The dimension of x should be {}'.format(self.input_size))
+        except IndexError:
+            d = x.shape[0]
+            if not d == self.input_size:
+                raise ValueError('The dimension of x should be {}'.format(self.input_size))
+            x = x.reshape(1, d)
+        return x
+    
+    def _get_gradient_W_hy(self, y):
+        """Gradient of the loss w.r.t W_hy. 
+        
+        Should have shape <m x d_h> where `m` is the 
+        number of classes and d_h is the size of the 
+        hidden layer
+        """
+        self.grad_oa = self.os - self._onehot(y)
+        grad_W_hy = self.grad_oa.dot(self.hs.T)
+        return grad_W_hy
+
+    def _get_gradient_b_hy(self):
+        """Gradient of the loss w.r.t b_hy. 
+        
+        Should have shape <m x 1> where `m` is the 
+        number of classes.
+        """
+        return self.grad_oa
+
+    def _get_gradient_W_xh(self, x):
+        """Gradient of the loss w.r.t W_xh. 
+        
+        Should have shape <d_h x d> where `d` is the 
+        dimension of the input and `d_h` is the dimension 
+        of the hidden layer.
+        """
+        grad_hs_ha = np.diag(self._relu_derivative(self.ha).reshape(self.hidden_size,))
+        self.grad_ha = self.grad_oa.T.dot(self.W_hy).dot(grad_hs_ha) 
+        grad_W_xh = self.grad_ha.T.dot(x)
+        return grad_W_xh
+
+    def _get_gradient_b_xh(self):
+        """Gradient of the loss w.r.t b_xh. 
+        
+        Should have shape <d_h x 1> where `d_h` is the 
+        dimension of the hidden layer.
+        """
+        return self.grad_ha.T
 
     def _relu_derivative(self, x):
         x[x<=0] = 0
@@ -87,18 +184,37 @@ class MLPClassifier(NN):
         return x
 
     def _onehot(self, y):
+        """convert an integer into a onehot vector
+        of dimension <m x 1> where m is the number
+        of classes"""
         onehot = np.zeros((self.ouput_size, 1))
         onehot[y, 0] = 1
         return onehot
+
+    def _reset_activations(self):
+        self.ha = None
+        self.hs = None
+        self.oa = None
+        self.os = None
+
+    def _reset_gradients(self):
+        self.grad_W_xh = 0
+        self.grad_b_xh = 0
+        self.grad_W_hy = 0
+        self.grad_b_hy = 0
+
 
 if __name__ == '__main__':
     
     x1 = [1, 2, 3, 4]
     x2 = [2,-1, 5, 3]
     x = np.array([x1, x2]) # 2 x 4
-    y = np.array([0, 2, 1])
+    y = np.array([0, 1])
 
     mlp = MLPClassifier(input_size=4, hidden_size=2, ouput_size=3)
-    pred = mlp.forward(x[0])
-    mlp.backward(x[0], y[0])
+    pred = mlp.forward(x)
+
+    pred = mlp.forward(x)
+    mlp.backward(x, y)
+    #mlp.finite_difference_check(x[0], y[0])
 
