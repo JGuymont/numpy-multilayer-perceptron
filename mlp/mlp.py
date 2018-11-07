@@ -6,7 +6,7 @@ Created on Fri Nov 2 2018
 import numpy as np
 import copy
 
-from nn import NN
+from mlp.nn import NN
 
 class MLPClassifier(NN):
     """MLP classifier
@@ -128,7 +128,16 @@ class MLPClassifier(NN):
         """
         prob = self.forward(x).T.dot(self._onehot(y))
         return -np.log(prob)
+    
+    def predict(self, X):
+        prob = self.forward(X)
+        return np.argmax(prob.T, axis=1)
 
+    def accuracy(self, X, y):
+        y_hat = self.predict(X)
+        correct = (y_hat == y).sum()
+        acc = correct / len(y)
+        return round(acc*100, 4)
     def _validate_input(self, x):
         """Make sure the input have the dimension <n x d>
         where n is the size of a batch"""
