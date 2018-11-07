@@ -3,38 +3,41 @@
 Created on Mon Jan 15 13:31:59 2018
 @author: J. Guymont
 """
+import numpy as np
 
-import random
+class DataLoader:
 
-class Dataloader:
-    """
-    Data loader. Combines a dataset and a sampler, and
-    provides an iterators over the training dataset.
-    Args:
-        batch_size (int, optional): how many samples per batch to load (default: 1).
-    """
-    def __init__(self):
-        pass
+    def __init__(self, data, batch_size):
+        self._data = data
+        self._inputs, self._targets = [list(t) for t in zip(*data)] 
+        self._batch_size = batch_size
+        self._data_size = len(self._data)
+        self._n_batch = self._data_size // self._batch_size + 1
 
-    def data_loader(self, inputs, targets, batch_size):
-        """provides an iterator over a dataset"""
-        data_size = len(targets)
-        examples = range(data_size)
+        self._dataloader = self._split_in_batch()
 
-        dataloader = []
+    def __len__(self):
+        return self._n_batch
 
-        for _ in range(int(data_size/batch_size)):
+    def __getitem__(self, i):
+        return self._dataloader[i]
 
-            #: randomly select examples for current SGD iteration
-            mini_batch = random.sample(examples, batch_size)
+    def _get_next_input_batch(self, last=False):
+        last_idx = self._batch_size if not last else len(self._inputs)
+        cur_batch = np.array([self._inputs.pop(0) for _ in range(last_idx)])
+        return cur_batch
 
-            #: remove current example from the list of examples
-            examples = [example for example in examples if example not in mini_batch]
+    def _get_next_target_batch(self, last=False):
+        last_idx = self._batch_size if not last else len(self._targets)
+        cur_batch = np.array([self._targets.pop(0) for _ in range(last_idx)])
+        return cur_batch
 
-            #: Convert array to tensor of size [batch_size, 1, img_size, img_size]
-            batch_x = inputs[mini_batch, :].reshape(batch_size, 28, 28)
-            batch_y = targets[mini_batch]
-
-            dataloader.append((batch_x, batch_y))
-
-        return dataloader
+    def _split_in_batch(self):
+        storage = {'inputs': [], 'targets': []}
+        for i in range(self._n_batch-1):
+            storage['inputs'].append(self._get_next_input_batch())
+            storage['targets'].append(self._get_next_target_batch())
+        if not len(self._inputs) == 0:
+            storage['inputs'].append(self._get_next_input_batch(last=True))
+            storage['targets'].append(self._get_next_target_batch(last=True)) 
+        return list(zip(storage['inputs'], storage['targets']))
