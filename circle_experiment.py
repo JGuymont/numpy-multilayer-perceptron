@@ -60,21 +60,24 @@ class Data:
 
 if __name__ == '__main__':
 
+    INPUT_DIM = 2
+    OUTPUT_DIM = 2
+
     # hyperparameters
     HIDDEN_DIM = 10
-    BATCH_SIZE = 1
-    NUM_EPOCHS = 100000
+    BATCH_SIZE = 5
+    NUM_EPOCHS = 100
     LEARNING_RATE = 0.01
 
     data = Data(CIRCLE_DATA_PATH, input_dim=2, split=[0.7, 0.15, 0.15])
-    trainloader = DataLoader(data.train(), batch_size=5)
+    trainloader = DataLoader(data.train(), batch_size=BATCH_SIZE)
     
     mlp = MLPClassifier(
-        input_size=2, 
-        hidden_size=20, 
-        ouput_size=2, 
-        learning_rate=0.01, 
-        num_epochs=100
+        input_size=INPUT_DIM, 
+        hidden_size=HIDDEN_DIM, 
+        output_size=OUTPUT_DIM, 
+        learning_rate=LEARNING_RATE, 
+        num_epochs=NUM_EPOCHS
     )
 
     acc = mlp.eval_accuracy(trainloader)

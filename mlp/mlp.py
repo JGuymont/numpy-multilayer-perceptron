@@ -20,9 +20,9 @@ class MLPClassifier(NN):
         output_size: (int) number of classes
     """
 
-    def __init__(self, input_size, hidden_size, ouput_size, learning_rate, num_epochs):
+    def __init__(self, input_size, hidden_size, output_size, learning_rate, num_epochs):
         self.input_size = input_size 
-        self.ouput_size = ouput_size
+        self.output_size = output_size
         
         # hyperparameters
         self.hidden_size = hidden_size
@@ -32,8 +32,8 @@ class MLPClassifier(NN):
         # parameters initialization
         self.W_xh = self.uniform_initalization(shape=(hidden_size, input_size))
         self.b_xh = self.zero_initialization(shape=(hidden_size, 1))
-        self.W_hy = self.uniform_initalization(shape=(ouput_size, hidden_size))
-        self.b_hy = self.zero_initialization(shape=(ouput_size, 1))
+        self.W_hy = self.uniform_initalization(shape=(output_size, hidden_size))
+        self.b_hy = self.zero_initialization(shape=(output_size, 1))
 
         # initialize gradient to zero
         self.grad_W_xh = 0
@@ -236,10 +236,10 @@ class MLPClassifier(NN):
             n = y.shape[0]
         except IndexError:
             n = 1
-            onehot = np.zeros((1, self.ouput_size))
+            onehot = np.zeros((1, self.output_size))
             onehot[0, y] = 1
             return onehot
-        onehot = np.zeros((n, self.ouput_size))
+        onehot = np.zeros((n, self.output_size))
         onehot[np.arange(n), y] = 1
         return onehot
 
@@ -264,7 +264,7 @@ if __name__ == '__main__':
     x = np.array([x1, x2]) # 2 x 4
     y = np.array([0, 1])
 
-    mlp = MLPClassifier(input_size=4, hidden_size=2, ouput_size=3, 
+    mlp = MLPClassifier(input_size=4, hidden_size=2, output_size=3, 
                         learning_rate=0.001, num_epochs=10)
     
     pred = mlp.forward(x)
