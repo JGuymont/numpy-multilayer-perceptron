@@ -79,6 +79,7 @@ class MLPClassifier(NN):
         d = X.shape[1]
         Y = [Y] if Y.shape == () else Y
         
+        self._reset_gradients()
         for x, y in zip(X, Y):
             self.forward(x, train=True)
             x = x.reshape(1, d)
@@ -99,11 +100,13 @@ class MLPClassifier(NN):
     def finite_difference_check(self, x, y, eps=1e-5):
         """Finite difference gradient check
         
-            gradient ~= (L(x, y; w + eps) - L(x, y; w)) / eps = grad_hat
+            gradient ~= (L(x, y; w + eps) - L(x, y; w)) / eps = gradHat
 
-            Should have 0.99 < grad / grad_hat < 1.01 
+            Should have 0.99 < grad / gradHat < 1.01 
         """ 
-        loss1 = self.nll_loss(x, y) 
+        self.forward(x, train=True)
+        self.backward(x, y)
+        loss1 = self.nll_loss(x, y)
         for param, grad in zip(self.parameters(), self.gradients()):
             for i in range(param.shape[0]):
                 for j in range(param.shape[1]):
@@ -114,6 +117,7 @@ class MLPClassifier(NN):
                     ratio = (grad[i,j]+1e-10) / (gradHat[0][0]+1e-10)
                     if not 0.99 < ratio < 1.01:
                         raise Warning('Finite difference not valid: ratio = {}'.format(ratio))
+        self._reset_activations()
             
     def nll_loss(self, x, y):
         """Negative loss likelihood
@@ -212,9 +216,8 @@ if __name__ == '__main__':
     y = np.array([0, 1])
 
     mlp = MLPClassifier(input_size=4, hidden_size=2, ouput_size=3)
-    pred = mlp.forward(x)
 
     pred = mlp.forward(x)
     mlp.backward(x, y)
-    #mlp.finite_difference_check(x[0], y[0])
+    mlp.finite_difference_check(x[0], y[0])
 
