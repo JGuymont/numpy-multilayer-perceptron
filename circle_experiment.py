@@ -1,37 +1,86 @@
 import numpy as np
+import random
 
 from mlp.mlp import MLPClassifier
+from mlp.dataloader import DataLoader
 
 CIRCLE_DATA_PATH = './data/circles/circles.txt'
 
-# hyperparameters
-HIDDEN_DIM = 10
-BATCH_SIZE = 1
-NUM_EPOCHS = 100000
-LEARNING_RATE = 0.01
+class Data:
+    """Abstract class for the smsSpamCollection
+
+    Args
+        path: (string) path to the dataset
+        input_dim: (int)
+        split: (list) list of float [train_pct, valid_pct, test_pct]
+    """
+
+    def __init__(self, path, input_dim, split):
+        self._raw_data = np.loadtxt(open(path, 'r'))
+        self._input_dim = input_dim
+        self._data = self._read_data()
+        self._data_index = self._split_index(split)
+
+    def __len__(self):
+        return len(self._data)
+
+    def __getitem__(self, i):
+        return self._data[i]
+
+    def _read_data(self):
+        inputs = self._raw_data[:, :self._input_dim]
+        targets = self._raw_data[:, -1].astype(int)
+        return list(zip(inputs, targets))
+
+    def _split_index(self, split):
+        storage = {'train': [], 'valid': [], 'test': []}
+        train_size = round(len(self)*split[0])
+        valid_size = round((len(self) - train_size)*split[1])
+
+        examples = range(len(self))
+        storage['train'] = random.sample(examples, train_size)
+        examples = [ex for ex in examples if ex not in storage['train']] # remove index
+        storage['valid'] = random.sample(examples, valid_size)
+        storage['test'] = [ex for ex in examples if ex not in storage['valid']]
+        return storage
+
+    def train(self):
+        return [self._data[i] for i in self._data_index['train']]
+
+    def valid(self):
+        return [self._data[i] for i in self._data_index['valid']]
+
+    def test(self):
+        return [self._data[i] for i in self._data_index['test']]
+
+    def dim_(self):
+        return self._input_dim
+
+
 
 if __name__ == '__main__':
-    data = np.loadtxt(open(CIRCLE_DATA_PATH, 'r'))
+
+    # hyperparameters
+    HIDDEN_DIM = 10
+    BATCH_SIZE = 1
+    NUM_EPOCHS = 100000
+    LEARNING_RATE = 0.01
+
+    data = Data(CIRCLE_DATA_PATH, input_dim=2, split=[0.7, 0.15, 0.15])
+    trainloader = DataLoader(data.train(), batch_size=5)
     
-    X = data[:, 0:2]
-    y = data[:, -1].astype(int)
+    mlp = MLPClassifier(
+        input_size=2, 
+        hidden_size=20, 
+        ouput_size=2, 
+        learning_rate=0.01, 
+        num_epochs=100
+    )
 
-    X_dim = X.shape[1]
-    y_dim = 2 # 0 or 1
-
-    
-
-    mlp = MLPClassifier(X_dim, HIDDEN_DIM, y_dim, LEARNING_RATE, NUM_EPOCHS)
-
-    #y = np.array([0, 1])
-    #onehot = mlp._onehot(y)
-    #print(y)
-    #print(onehot)
-
-    acc = mlp.accuracy(X,y)
+    acc = mlp.eval_accuracy(trainloader)
     print(acc)
-    mlp.train(zip(X, y))
-    acc = mlp.accuracy(X,y)
+    mlp.train(trainloader)
+    acc = mlp.eval_accuracy(trainloader)
     print(acc)
 
 
