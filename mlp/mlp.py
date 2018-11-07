@@ -152,10 +152,13 @@ class MLPClassifier(NN):
         prob = self.forward(X)
         return np.argmax(prob.T, axis=0)
 
-    def accuracy(self, X, y):
-        y_hat = self.predict(X)
-        correct = (y_hat == y).sum()
-        acc = correct / len(y)
+    def eval_accuracy(self, dataloader):
+        correct, total = 0, 0
+        for inputs, targets in dataloader:
+            y_hat = self.predict(inputs)
+            correct += (y_hat == targets).sum()
+            total += len(targets)
+        acc = correct / total
         return round(acc*100, 4)
 
     def _validate_input(self, x):
@@ -164,11 +167,11 @@ class MLPClassifier(NN):
         try:
             d = x.shape[1]
             if not d == self.input_size:
-                raise ValueError('The dimension of x should be {}'.format(self.input_size))
+                raise ValueError('The dimension of x should be {} not {}'.format(self.input_size, d))
         except IndexError:
             d = x.shape[0]
             if not d == self.input_size:
-                raise ValueError('The dimension of x should be {}'.format(self.input_size))
+                raise ValueError('The dimension of x should be {} not {}'.format(self.input_size, d))
             x = x.reshape(1, d)
         return x
     
