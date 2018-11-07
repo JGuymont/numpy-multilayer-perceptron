@@ -20,15 +20,22 @@ class MLPClassifier(NN):
         output_size: (int) number of classes
     """
 
-    def __init__(self, input_size, hidden_size, ouput_size):
+    def __init__(self, input_size, hidden_size, ouput_size, learning_rate, num_epochs):
         self.input_size = input_size 
         self.ouput_size = ouput_size
+        
+        # hyperparameters
         self.hidden_size = hidden_size
+        self.learning_rate = learning_rate
+        self.num_epochs = num_epochs
+
+        # parameters initialization
         self.W_xh = self.uniform_initalization(shape=(hidden_size, input_size))
         self.b_xh = self.zero_initialization(shape=(hidden_size, 1))
         self.W_hy = self.uniform_initalization(shape=(ouput_size, hidden_size))
         self.b_hy = self.zero_initialization(shape=(ouput_size, 1))
 
+        # initialize gradient to zero
         self.grad_W_xh = 0
         self.grad_b_xh = 0
         self.grad_W_hy = 0
@@ -57,6 +64,10 @@ class MLPClassifier(NN):
         
         Args
             x: (array) array of dimension <n x d>
+
+        return: (Array) Array of dimension <n x m> 
+            where `m` is the number of class and `n` 
+            is the number of examples. 
         """
         x = self._validate_input(x)
         ha = self.W_xh.dot(x.T) + self.b_xh
@@ -65,7 +76,7 @@ class MLPClassifier(NN):
         os = self.softmax(oa)
         if train:
             self.ha, self.hs, self.oa, self.os = ha, hs, oa, os
-        return os
+        return os.T
 
     def backward(self, X, Y):
         """Backward probagation
@@ -75,14 +86,13 @@ class MLPClassifier(NN):
             Y: (array) target batch of dimension <k x 1>
         """
         X = self._validate_input(X)
+        Y = [Y] if Y.shape == () else Y # in case there is only one target
         batch_size = X.shape[0]
-        d = X.shape[1]
-        Y = [Y] if Y.shape == () else Y
         
         self._reset_gradients()
         for x, y in zip(X, Y):
             self.forward(x, train=True)
-            x = x.reshape(1, d)
+            x = x.reshape(1, self.input_size)
             self.grad_W_hy += self._get_gradient_W_hy(y)
             self.grad_b_hy += self._get_gradient_b_hy()
             self.grad_W_xh += self._get_gradient_W_xh(x)
@@ -93,9 +103,18 @@ class MLPClassifier(NN):
 
         self._reset_activations()
 
-    def optimize(self, X, Y):
-        for x, y in zip(X, Y):
-            self.backward(x, y)
+    def train(self, dataloader):
+        """Train the model using stochastic gradient"""
+        for epoch in range(self.num_epochs):
+
+            for inputs, targets in dataloader:
+
+                self.backward(inputs, targets)
+
+                self.W_xh -= self.learning_rate * self.grad_W_xh 
+                self.b_xh -= self.learning_rate * self.grad_b_xh 
+                self.W_hy -= self.learning_rate * self.grad_W_hy 
+                self.b_hy -= self.learning_rate * self.grad_b_hy 
 
     def finite_difference_check(self, x, y, eps=1e-5):
         """Finite difference gradient check
@@ -126,18 +145,19 @@ class MLPClassifier(NN):
             x: (array) input
             y: (int) class in {0,...,m-1} where m is the number of classes
         """
-        prob = self.forward(x).T.dot(self._onehot(y))
+        prob = self.forward(x).dot(self._onehot(y).T)
         return -np.log(prob)
     
     def predict(self, X):
         prob = self.forward(X)
-        return np.argmax(prob.T, axis=1)
+        return np.argmax(prob.T, axis=0)
 
     def accuracy(self, X, y):
         y_hat = self.predict(X)
         correct = (y_hat == y).sum()
         acc = correct / len(y)
         return round(acc*100, 4)
+
     def _validate_input(self, x):
         """Make sure the input have the dimension <n x d>
         where n is the size of a batch"""
@@ -159,7 +179,7 @@ class MLPClassifier(NN):
         number of classes and d_h is the size of the 
         hidden layer
         """
-        self.grad_oa = self.os - self._onehot(y)
+        self.grad_oa = self.os - self._onehot(y).T
         grad_W_hy = self.grad_oa.dot(self.hs.T)
         return grad_W_hy
 
@@ -197,11 +217,27 @@ class MLPClassifier(NN):
         return x
 
     def _onehot(self, y):
-        """convert an integer into a onehot vector
-        of dimension <m x 1> where m is the number
-        of classes"""
-        onehot = np.zeros((self.ouput_size, 1))
-        onehot[y, 0] = 1
+        """convert an integer into a onehot vector 
+        of dimension <m x n> where m is the number
+        of classes
+        
+        Args
+            y: (array) Array (of int) with dim <n> ((n, ) in numpy format)
+                where `n` is the number of training example, 
+                each element correspondind to a target
+
+        return: (Array) Array of dimension <n x m> 
+        """
+        
+        try:
+            n = y.shape[0]
+        except IndexError:
+            n = 1
+            onehot = np.zeros((1, self.ouput_size))
+            onehot[0, y] = 1
+            return onehot
+        onehot = np.zeros((n, self.ouput_size))
+        onehot[np.arange(n), y] = 1
         return onehot
 
     def _reset_activations(self):
@@ -218,14 +254,16 @@ class MLPClassifier(NN):
 
 
 if __name__ == '__main__':
+    # Very simple unit testing
     
     x1 = [1, 2, 3, 4]
     x2 = [2,-1, 5, 3]
     x = np.array([x1, x2]) # 2 x 4
     y = np.array([0, 1])
 
-    mlp = MLPClassifier(input_size=4, hidden_size=2, ouput_size=3)
-
+    mlp = MLPClassifier(input_size=4, hidden_size=2, ouput_size=3, 
+                        learning_rate=0.001, num_epochs=10)
+    
     pred = mlp.forward(x)
     mlp.backward(x, y)
     mlp.finite_difference_check(x[0], y[0])
