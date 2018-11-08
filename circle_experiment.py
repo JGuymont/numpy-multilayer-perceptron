@@ -7,7 +7,7 @@ from mlp.dataloader import DataLoader
 CIRCLE_DATA_PATH = './data/circles/circles.txt'
 
 class Data:
-    """Abstract class for the smsSpamCollection
+    """Abstract class for the circles dataset
 
     Args
         path: (string) path to the dataset
@@ -57,7 +57,6 @@ class Data:
         return self._input_dim
 
 
-
 if __name__ == '__main__':
 
     INPUT_DIM = 2
@@ -80,6 +79,14 @@ if __name__ == '__main__':
         num_epochs=NUM_EPOCHS
     )
 
+    X = np.ones((3, 2))
+    y = np.ones(3).astype(int)
+
+    mlp.backward(X, y, crazy_loop=False)
+    grad_W_hy = mlp.grad_W_hy
+    print(grad_W_hy.shape)
+
+    exit()
     acc = mlp.eval_accuracy(trainloader)
     print(acc)
     mlp.train(trainloader)

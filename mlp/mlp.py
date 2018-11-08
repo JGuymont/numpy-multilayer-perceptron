@@ -78,7 +78,7 @@ class MLPClassifier(NN):
             self.ha, self.hs, self.oa, self.os = ha, hs, oa, os
         return os.T
 
-    def backward(self, X, Y):
+    def backward(self, X, Y, crazy_loop=True):
         """Backward probagation
 
         Args
@@ -87,19 +87,29 @@ class MLPClassifier(NN):
         """
         X = self._validate_input(X)
         Y = [Y] if Y.shape == () else Y # in case there is only one target
+                                        # for the loop downstairs
         batch_size = X.shape[0]
         
         self._reset_gradients()
-        for x, y in zip(X, Y):
-            self.forward(x, train=True)
-            x = x.reshape(1, self.input_size)
-            self.grad_W_hy += self._get_gradient_W_hy(y)
-            self.grad_b_hy += self._get_gradient_b_hy()
-            self.grad_W_xh += self._get_gradient_W_xh(x)
-            self.grad_b_xh += self._get_gradient_b_xh()
+        
+        if crazy_loop:
+            for x, y in zip(X, Y):
+                self.forward(x, train=True)
+                x = x.reshape(1, self.input_size)
+                self.grad_W_hy += self._get_gradient_W_hy(y)
+                self.grad_b_hy += self._get_gradient_b_hy()
+                self.grad_W_xh += self._get_gradient_W_xh(x)
+                self.grad_b_xh += self._get_gradient_b_xh()
 
-        for grad in self.gradients():
-            grad /= batch_size 
+            for grad in self.gradients():
+                grad /= batch_size
+        else:
+            self.forward(X, train=True)
+            self.grad_W_hy = self._get_gradient_W_hy(Y)
+            #self.grad_b_hy = self._get_gradient_b_hy()
+            #self.grad_W_xh = self._get_gradient_W_xh(X)
+            #self.grad_b_xh = self._get_gradient_b_xh()
+            
 
         self._reset_activations()
 
