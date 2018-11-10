@@ -9,7 +9,11 @@ class DataLoader:
 
     def __init__(self, data, batch_size):
         self._data = data
-        self._inputs, self._targets = [list(t) for t in zip(*data)] 
+        try:
+            self._inputs, self._targets = [list(t) for t in zip(*data)] 
+        except TypeError:
+            self._inputs = [data[0]]
+            self._targets = [data[1]]
         self._batch_size = batch_size
         self._data_size = len(self._data)
         self._n_batch = self._data_size // self._batch_size + 1
@@ -41,3 +45,6 @@ class DataLoader:
             storage['inputs'].append(self._get_next_input_batch(last=True))
             storage['targets'].append(self._get_next_target_batch(last=True)) 
         return list(zip(storage['inputs'], storage['targets']))
+
+    def data_size_(self):
+        return self._data_size
