@@ -1,8 +1,11 @@
 import numpy as np
 import random
+import time
 
 from mlp.mlp import MLPClassifier
 from mlp.dataloader import DataLoader
+
+np.random.seed(0)
 
 CIRCLE_DATA_PATH = './data/circles/circles.txt'
 
@@ -56,21 +59,21 @@ class Data:
     def dim_(self):
         return self._input_dim
 
-
 if __name__ == '__main__':
 
     INPUT_DIM = 2
     OUTPUT_DIM = 2
 
     # hyperparameters
-    HIDDEN_DIM = 10
-    BATCH_SIZE = 5
-    NUM_EPOCHS = 100
+    HIDDEN_DIM = 2
+    BATCH_SIZE = 10
+    NUM_EPOCHS = 20
     LEARNING_RATE = 0.01
 
     data = Data(CIRCLE_DATA_PATH, input_dim=2, split=[0.7, 0.15, 0.15])
     trainloader = DataLoader(data.train(), batch_size=BATCH_SIZE)
-    
+    devloader = DataLoader(data.valid(), batch_size=BATCH_SIZE)
+
     mlp = MLPClassifier(
         input_size=INPUT_DIM, 
         hidden_size=HIDDEN_DIM, 
@@ -79,20 +82,13 @@ if __name__ == '__main__':
         num_epochs=NUM_EPOCHS
     )
 
-    X = np.ones((3, 2))
-    y = np.ones(3).astype(int)
+    # mlp.train(trainloader, devloader, crazy_loop=True)
 
-    mlp.backward(X, y, crazy_loop=False)
-    grad_W_hy = mlp.grad_W_hy
-    print(grad_W_hy.shape)
+    def question1():
+        x = data[0]
+        y = data[0]
+        trainloader = DataLoader(data[0], batch_size=BATCH_SIZE)
+        mlp.train(trainloader, crazy_loop=True)
+        mlp._numerical_gradient(trainloader)
 
-    exit()
-    acc = mlp.eval_accuracy(trainloader)
-    print(acc)
-    mlp.train(trainloader)
-    acc = mlp.eval_accuracy(trainloader)
-    print(acc)
-
-
-
-    
+    question1()
