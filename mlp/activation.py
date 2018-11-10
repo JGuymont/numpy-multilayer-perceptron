@@ -7,14 +7,14 @@ class Activation:
     def softmax(x):
         """Stable softmax implementation"""
         try:
-            d = x.shape[1]
+            n = x.shape[1]
         except IndexError:
-            d = 1
-        n = x.shape[0]
-        max_x = np.max(x, axis=1).reshape(n, 1) if not d == 1 else np.max(x) 
+            n = 1
+        out_dim = x.shape[0]
+        max_x = np.max(x, axis=0).reshape(1, n) if not n == 1 else np.max(x) 
         z = x - max_x
         numerator = exp(z)
-        denominator = np.sum(numerator, axis=1).reshape(n, 1) if not d == 1 else sum(numerator)
+        denominator = np.sum(numerator, axis=0).reshape(1, n) if not out_dim == 1 else sum(numerator)
         return numerator / denominator
 
     @staticmethod
