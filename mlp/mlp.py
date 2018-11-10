@@ -5,6 +5,7 @@ Created on Fri Nov 2 2018
 """
 import numpy as np
 import copy
+import time
 
 from mlp.nn import NN
 
@@ -20,7 +21,17 @@ class MLPClassifier(NN):
         output_size: (int) number of classes
     """
 
-    def __init__(self, input_size, hidden_size, output_size, learning_rate, num_epochs):
+    def __init__(self, input_size, 
+                       hidden_size, 
+                       output_size, 
+                       learning_rate, 
+                       num_epochs, 
+                       lambda11=0.01,
+                       lambda12=0.01,
+                       lambda21=0.01,
+                       lambda22=0.01
+        ):
+        
         self.input_size = input_size 
         self.output_size = output_size
         
@@ -28,6 +39,10 @@ class MLPClassifier(NN):
         self.hidden_size = hidden_size
         self.learning_rate = learning_rate
         self.num_epochs = num_epochs
+        self.lambda11 = lambda11
+        self.lambda12 = lambda12
+        self.lambda21 = lambda21
+        self.lambda22 = lambda22
 
         # parameters initialization
         self.W_xh = self.uniform_initalization(shape=(hidden_size, input_size))
@@ -78,7 +93,7 @@ class MLPClassifier(NN):
             self.ha, self.hs, self.oa, self.os = ha, hs, oa, os
         return os.T
 
-    def backward(self, X, Y, crazy_loop=True):
+    def backward(self, X, Y, crazy_loop=False):
         """Backward probagation
 
         Args
@@ -86,46 +101,64 @@ class MLPClassifier(NN):
             Y: (array) target batch of dimension <k x 1>
         """
         X = self._validate_input(X)
-        Y = [Y] if Y.shape == () else Y # in case there is only one target
-                                        # for the loop downstairs
+        
         batch_size = X.shape[0]
         
-        self._reset_gradients()
+        self.forward(X, train=True)
+
+        grad_oa    = self.os - self._onehot(Y).T
+        grad_W_hy  = grad_oa.dot(self.hs.T)       
+        grad_b_hy  = np.sum(grad_oa, axis=1).reshape(grad_oa.shape[0], 1)
+        grad_hs    = grad_oa.T.dot(self.W_hy)
+        grad_hs_ha = self._relu_prime(self.ha)       
+        grad_ha    = grad_hs_ha * grad_hs.T          
+        grad_W_xh  = grad_ha.dot(X)                
+        grad_b_xh  = np.sum(grad_ha, axis=1).reshape(grad_ha.shape[0], 1)
         
-        if crazy_loop:
-            for x, y in zip(X, Y):
-                self.forward(x, train=True)
-                x = x.reshape(1, self.input_size)
-                self.grad_W_hy += self._get_gradient_W_hy(y)
-                self.grad_b_hy += self._get_gradient_b_hy()
-                self.grad_W_xh += self._get_gradient_W_xh(x)
-                self.grad_b_xh += self._get_gradient_b_xh()
+        assert(grad_W_hy.shape == self.W_hy.shape)
+        assert(grad_b_hy.shape == self.b_hy.shape)
+        assert(grad_W_xh.shape == self.W_xh.shape)
+        assert(grad_b_xh.shape == self.b_xh.shape)
 
-            for grad in self.gradients():
-                grad /= batch_size
-        else:
-            self.forward(X, train=True)
-            self.grad_W_hy = self._get_gradient_W_hy(Y)
-            #self.grad_b_hy = self._get_gradient_b_hy()
-            #self.grad_W_xh = self._get_gradient_W_xh(X)
-            #self.grad_b_xh = self._get_gradient_b_xh()
-            
+        grad_reg_11 = np.mean(np.sign(self.W_xh))
+        grad_reg_12 = 2 * sum(self.W_xh)
+        grad_reg_21 = np.mean(np.sign(self.W_hy))
+        grad_reg_22 = 2 * sum(self.W_hy)
 
-        self._reset_activations()
+        self.grad_W_hy = grad_W_hy / batch_size + self.lambda21 * grad_reg_21 + self.lambda22 * grad_reg_22 
+        self.grad_b_hy = grad_b_hy / batch_size
+        self.grad_W_xh = grad_W_xh / batch_size + self.lambda11 * grad_reg_11 + self.lambda12 * grad_reg_12
+        self.grad_b_xh = grad_b_xh / batch_size
 
-    def train(self, dataloader):
+    def train(self, trainloader, devloader=None, crazy_loop=False):
         """Train the model using stochastic gradient"""
-        for epoch in range(self.num_epochs):
+        starting_time = time.time()
+        for epoch in range(self.num_epochs):    
 
-            for inputs, targets in dataloader:
+            for inputs, targets in trainloader:
 
-                self.backward(inputs, targets)
+                self.backward(inputs, targets, crazy_loop)
 
                 self.W_xh -= self.learning_rate * self.grad_W_xh 
                 self.b_xh -= self.learning_rate * self.grad_b_xh 
                 self.W_hy -= self.learning_rate * self.grad_W_hy 
                 self.b_hy -= self.learning_rate * self.grad_b_hy 
 
+            if epoch % 10 == 0 and epoch > 0:
+                current_time = time.time()
+                loss = self._nll_loss(trainloader)
+                train_acc = self.eval_accuracy(trainloader)
+                dev_acc = self.eval_accuracy(devloader) if devloader is not None else 'na'
+                print('epoch: {} | loss: {} | train acc: {}% | valid acc: {}% | time: {}'.format(
+                    epoch, loss, train_acc, dev_acc, self._get_time(starting_time, current_time)
+                ))
+                
+    def _get_time(self, starting_time, current_time):
+        total_time = current_time - starting_time
+        minutes = round(total_time // 60)
+        seconds = round(total_time % 60)
+        return '{} min., {} sec.'.format(minutes, seconds)
+    
     def finite_difference_check(self, x, y, eps=1e-5):
         """Finite difference gradient check
         
@@ -147,17 +180,40 @@ class MLPClassifier(NN):
                     if not 0.99 < ratio < 1.01:
                         raise Warning('Finite difference not valid: ratio = {}'.format(ratio))
         self._reset_activations()
-            
-    def nll_loss(self, x, y):
+
+    def nll_loss(self, X, Y):
         """Negative loss likelihood
 
         Args
             x: (array) input
             y: (int) class in {0,...,m-1} where m is the number of classes
         """
-        prob = self.forward(x).dot(self._onehot(y).T)
-        return -np.log(prob)
+        loss = 0
+        for x, y in zip(X, Y):
+            prob = self.forward(x).dot(self._onehot(y).T)
+            loss += -np.log(prob)
+        return loss / len(y)
     
+    def _nll_loss(self, dataloader):
+        """Negative loss likelihood
+
+        Args
+            x: (array) input
+            y: (int) class in {0,...,m-1} where m is the number of classes
+        """
+        loss = 0
+        for X, Y in dataloader:
+            for x, y in zip(X, Y):
+                prob = self.forward(x).dot(self._onehot(y).T)
+                loss += -np.log(prob)
+                loss += self.lambda11 * np.sum(np.abs(self.W_xh))
+                loss += self.lambda12 * np.sum(np.square(self.W_xh))
+                loss += self.lambda21 * np.sum(np.abs(self.W_hy))
+                loss += self.lambda22 * np.sum(np.square(self.W_hy))
+                
+        loss = round(loss[0][0] / dataloader.data_size_(), 5)
+        return loss
+
     def predict(self, X):
         prob = self.forward(X)
         return np.argmax(prob.T, axis=0)
@@ -169,7 +225,7 @@ class MLPClassifier(NN):
             correct += (y_hat == targets).sum()
             total += len(targets)
         acc = correct / total
-        return round(acc*100, 4)
+        return round(acc*100, 2)
 
     def _validate_input(self, x):
         """Make sure the input have the dimension <n x d>
@@ -184,49 +240,10 @@ class MLPClassifier(NN):
                 raise ValueError('The dimension of x should be {} not {}'.format(self.input_size, d))
             x = x.reshape(1, d)
         return x
-    
-    def _get_gradient_W_hy(self, y):
-        """Gradient of the loss w.r.t W_hy. 
-        
-        Should have shape <m x d_h> where `m` is the 
-        number of classes and d_h is the size of the 
-        hidden layer
-        """
-        self.grad_oa = self.os - self._onehot(y).T
-        grad_W_hy = self.grad_oa.dot(self.hs.T)
-        return grad_W_hy
 
-    def _get_gradient_b_hy(self):
-        """Gradient of the loss w.r.t b_hy. 
-        
-        Should have shape <m x 1> where `m` is the 
-        number of classes.
-        """
-        return self.grad_oa
-
-    def _get_gradient_W_xh(self, x):
-        """Gradient of the loss w.r.t W_xh. 
-        
-        Should have shape <d_h x d> where `d` is the 
-        dimension of the input and `d_h` is the dimension 
-        of the hidden layer.
-        """
-        grad_hs_ha = np.diag(self._relu_derivative(self.ha).reshape(self.hidden_size,))
-        self.grad_ha = self.grad_oa.T.dot(self.W_hy).dot(grad_hs_ha) 
-        grad_W_xh = self.grad_ha.T.dot(x)
-        return grad_W_xh
-
-    def _get_gradient_b_xh(self):
-        """Gradient of the loss w.r.t b_xh. 
-        
-        Should have shape <d_h x 1> where `d_h` is the 
-        dimension of the hidden layer.
-        """
-        return self.grad_ha.T
-
-    def _relu_derivative(self, x):
-        x[x<=0] = 0
-        x[x>0] = 1
+    def _relu_prime(self, x):
+        x[x <= 0] = 0
+        x[x > 0] = 1
         return x
 
     def _onehot(self, y):
@@ -264,7 +281,6 @@ class MLPClassifier(NN):
         self.grad_b_xh = 0
         self.grad_W_hy = 0
         self.grad_b_hy = 0
-
 
 if __name__ == '__main__':
     # Very simple unit testing
