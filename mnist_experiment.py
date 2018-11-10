@@ -102,7 +102,7 @@ if __name__ == '__main__':
         plt.plot(acc, label='Acc. {}'.format(dataset))
         i += 1
 
-    plt.show()
+    #plt.show()
 
     #exit()
 
