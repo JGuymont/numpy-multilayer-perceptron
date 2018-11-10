@@ -6,8 +6,6 @@ Created on Fri Nov 2 2018
 
 import numpy as np
 
-np.random.seed(0)
-
 class Init:
 
     @staticmethod
