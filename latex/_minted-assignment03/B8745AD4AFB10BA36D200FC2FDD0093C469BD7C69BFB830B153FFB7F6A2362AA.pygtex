@@ -1,4 +1,0 @@
-\begin{Verbatim}[commandchars=\\\{\}]
-\PYG{n}{grad\PYGZus{}b\PYGZus{}2} \PYG{o}{=} \PYG{n}{grad\PYGZus{}oa}
-\PYG{n}{grad\PYGZus{}W\PYGZus{}2} \PYG{o}{=} \PYG{n}{grad\PYGZus{}ha}\PYG{o}{.}\PYG{n}{dot}\PYG{p}{(}\PYG{n}{X}\PYG{p}{)}
-\end{Verbatim}
