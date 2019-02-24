@@ -179,6 +179,7 @@ class MLPClassifier(NN):
 
             if log:
                 log.write(log_message)
+                log.write('\n')
 
             if epoch % 1 == 0 and epoch > 0:
                 print(log_message)
