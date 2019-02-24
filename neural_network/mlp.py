@@ -9,7 +9,7 @@ import copy
 import time
 import warnings
 
-from mlp.nn import NN
+from neural_network.nn import NN
 
 
 class MLPClassifier(NN):
