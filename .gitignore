@@ -2,6 +2,7 @@ old/
 data/mnist/
 data/circles/
 data/backup/
+.vscode/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

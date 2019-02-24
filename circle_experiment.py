@@ -90,7 +90,7 @@ def main_experiment(train_data, valid_data):
     devloader = DataLoader(valid_data, batch_size=len(valid_data))
 
     mlp = MLPClassifier(constants.Circles.INPUT_DIM, constants.Circles.N_CLASSES, 10, 0.05, 50)
-    mlp.train(trainloader, devloader)
+    mlp.train(trainloader, devloader, log=os.path.join(constants.Circles.RESULTS_DIR, 'circles_log.txt'))
 
 
 if __name__ == '__main__':
