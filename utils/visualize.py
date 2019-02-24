@@ -63,16 +63,20 @@ def plot_result(X_train, Y_train, X_test, Y_test, predictions, title=None, y_lim
 def plot_mnist_results(loss_storage, acc_storage, out_path):
     i = 0
     plt.figure(1)
-    plot_id = [231, 232, 233, 234, 235, 236]
+    plot_id = [221, 222, 223, 224]
     for dataset, losses in loss_storage.items():
         plt.subplot(plot_id[i])
-        plt.plot(losses, label='Loss {}'.format(dataset))
+        plt.plot(losses)
+        plt.xlabel('epoch')
+        plt.ylabel('Loss {}'.format(dataset))
         i += 1
 
     for dataset, acc in acc_storage.items():
         plt.subplot(plot_id[i])
-        plt.plot(acc, label='Acc. {}'.format(dataset))
+        plt.plot(acc)
+        plt.xlabel('epoch')
+        plt.ylabel('Acc. {}'.format(dataset))
         i += 1
 
-    plt.savefig(out_path, bbox_inches='tight')
+    plt.savefig(out_path)
     plt.close()
