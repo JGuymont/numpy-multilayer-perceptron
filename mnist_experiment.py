@@ -9,7 +9,7 @@ from constants import MNIST as constants
 from utils.dataset import Dataset
 from utils.dataloader import DataLoader
 from utils import visualize
-from mlp.mlp import MLPClassifier
+from neural_network.mlp import MLPClassifier
 
 
 if __name__ == '__main__':
