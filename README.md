@@ -1,11 +1,23 @@
-# IFT6390-assignment03
+# One hidden layer MLP implementation in Numpy
 
-## Download fashion MNIST
-`pip3 install googledrivedownloader`
+## Data
 
-`pip3 install requests`
+* [Fashion MNIST](https://github.com/zalandoresearch/fashion-mnist)
 
-`python data/download_fashion_mnist.py`
+* [Circles dataset](https://studium.umontreal.ca/pluginfile.php/4052447/mod_page/content/9/circles.txt)
 
-## Dowload `circles.txt`
-[circles dataset](https://studium.umontreal.ca/pluginfile.php/4052447/mod_page/content/9/circles.txt)
+## Running the experiment
+
+The details of the experiment can be found [here](https://github.com/JGuymont/mila-courses/blob/master/ift6390/assignment03/assignment03.pdf)
+
+To run the cicle experiment
+
+```shell
+python circle_experiment.py
+```
+
+To run the mnist experiment:
+
+```shell
+python mnist_experiment.py
+```
